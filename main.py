@@ -1,72 +1,4 @@
-
-# from fastapi import FastAPI, HTTPException
-# from pydantic import BaseModel
-# import joblib
-# import numpy as np
-# import pandas as pd
-# from fastapi.middleware.cors import CORSMiddleware
-# # Load trained model and encoders
-# model = joblib.load("stroketron_model.pkl")
-
-# app = FastAPI()
-
-# app.add_middleware(
-#     CORSMiddleware,
-#     allow_origins=["*"],  # Or ["http://localhost:5173"] for stricter security
-#     allow_credentials=True,
-#     allow_methods=["*"],
-#     allow_headers=["*"],
-# )
-
-# # Define input features
-# class StrokeInput(BaseModel):
-#     gender: str
-#     age: float
-#     hypertension: int
-#     heart_disease: int
-#     ever_married: str
-#     work_type: str
-#     Residence_type: str
-#     avg_glucose_level: float
-#     bmi: float
-#     smoking_status: str
-
-# # Label encoders used during training
-# def encode_input(data):
-#     le_dict = {
-#         'gender': {'Male': 1, 'Female': 0, 'Other': 2},
-#         'ever_married': {'Yes': 1, 'No': 0},
-#         'work_type': {'Private': 2, 'Self-employed': 3, 'Govt_job': 0, 'children': 1, 'Never_worked': 4},
-#         'Residence_type': {'Urban': 1, 'Rural': 0},
-#         'smoking_status': {'formerly smoked': 1, 'never smoked': 2, 'smokes': 3, 'Unknown': 0}
-#     }
-
-#     for col, mapping in le_dict.items():
-#         if data[col] not in mapping:
-#             raise HTTPException(status_code=400, detail=f"Invalid categorical input: '{data[col]}' for {col}")
-#         data[col] = mapping[data[col]]
-
-#     return data
-
-# @app.post("/predict/")
-# def predict_stroke_risk(input_data: StrokeInput):
-#     try:
-#         # Convert to dict and encode
-#         data = encode_input(input_data.dict())
-#         df = pd.DataFrame([data])
-
-#         # Predict probability
-#         probability = model.predict_proba(df)[0][1]  # index 1 = probability of stroke
-#         prediction = int(probability > 0.5)
-
-#         return {
-#             "prediction": prediction,
-#             "probability": round(probability, 3),
-#             "message": f"The probability of having a stroke is {round(probability * 100, 2)}%"
-#         }
-#     except Exception as e:
-#         raise HTTPException(status_code=500, detail=str(e))
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query, Response
 from pydantic import BaseModel
 import joblib
 import numpy as np
@@ -76,21 +8,23 @@ from fastapi.responses import FileResponse
 from datetime import datetime
 import os
 from fpdf import FPDF
+from gtts import gTTS
+from io import BytesIO
 
-# Load trained model
+# --- Model load (kept as-is) ---
 model = joblib.load("stroketron_model.pkl")
 
 app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],        # tighten in production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# User registration (temporary in-memory)
+# --- Simple in-memory users (kept as-is) ---
 users = {}
 
 class RegisterInput(BaseModel):
@@ -110,7 +44,7 @@ class StrokeInput(BaseModel):
     bmi: float
     smoking_status: str
 
-# Label encoding
+# --- Label encoding (kept as-is) ---
 def encode_input(data):
     le_dict = {
         'gender': {'Male': 1, 'Female': 0, 'Other': 2},
@@ -127,7 +61,7 @@ def encode_input(data):
 
     return data
 
-# Registration endpoint
+# --- Registration (kept as-is) ---
 @app.post("/register/")
 def register_user(user: RegisterInput):
     if user.username in users:
@@ -135,7 +69,7 @@ def register_user(user: RegisterInput):
     users[user.username] = user.password
     return {"message": f"User {user.username} registered successfully."}
 
-# Prediction endpoint
+# --- Prediction (kept as-is) ---
 @app.post("/predict/")
 def predict_stroke_risk(input_data: StrokeInput):
     try:
@@ -157,7 +91,6 @@ def predict_stroke_risk(input_data: StrokeInput):
             "username": username
         }
 
-        # Save to generate later as PDF
         os.makedirs("reports", exist_ok=True)
         pdf_path = f"reports/{username}_stroke_report.pdf"
         generate_pdf_report(raw_data, result, pdf_path)
@@ -168,7 +101,7 @@ def predict_stroke_risk(input_data: StrokeInput):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# PDF Generation function
+# --- PDF generation (kept as-is) ---
 def generate_pdf_report(user_input, result, filename):
     pdf = FPDF()
     pdf.add_page()
@@ -187,7 +120,7 @@ def generate_pdf_report(user_input, result, filename):
 
     pdf.output(filename)
 
-# PDF download route
+# --- PDF download (kept as-is) ---
 @app.get("/download-pdf/{username}")
 def download_pdf(username: str):
     pdf_path = f"reports/{username}_stroke_report.pdf"
@@ -195,3 +128,33 @@ def download_pdf(username: str):
         return FileResponse(path=pdf_path, filename=f"{username}_stroke_report.pdf", media_type='application/pdf')
     else:
         raise HTTPException(status_code=404, detail="PDF not found.")
+
+# =========================
+# NEW: gTTS voice endpoint
+# =========================
+def synthesize_gtts_mp3(text: str, lang: str = "en", tld: str = "co.in") -> bytes:
+    """
+    Convert text to MP3 bytes using Google Text-to-Speech.
+    lang options include: 'en', 'bn', 'hi', etc.
+    tld controls accent region for English (e.g., 'co.in', 'com.au', 'co.uk').
+    """
+    if not text or not text.strip():
+        raise HTTPException(status_code=400, detail="Missing or empty 'text'.")
+    try:
+        buf = BytesIO()
+        gTTS(text=text, lang=lang, tld=tld, slow=False).write_to_fp(buf)
+        return buf.getvalue()
+    except Exception as e:
+        # gTTS reaches out to Google; ensure server has internet
+        raise HTTPException(status_code=500, detail=f"TTS error: {e}")
+
+@app.get("/tts")
+def tts(
+    text: str = Query(..., min_length=1),
+    lang: str = Query("en"),   # 'bn' for Bengali, 'hi' for Hindi
+    tld: str = Query("co.in")  # Indian English accent when lang='en'
+):
+    audio_bytes = synthesize_gtts_mp3(text=text, lang=lang, tld=tld)
+    # Return raw MP3 for the browser to play
+    return Response(content=audio_bytes, media_type="audio/mpeg", headers={"Cache-Control": "no-store"})
+
