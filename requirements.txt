@@ -5,3 +5,13 @@ joblib
 numpy
 pandas
 fpdf 
+uvicorn
+pydantic
+python-dotenv
+pandas
+numpy
+scikit-learn
+joblib
+fpdf2
+gTTS
+twilio

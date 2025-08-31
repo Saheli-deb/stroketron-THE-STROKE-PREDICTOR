@@ -1,0 +1,31 @@
+# render.yaml
+services:
+  - type: web
+    name: stroketron-api
+    env: python
+    plan: free           # or 'starter'/'standard' if you need more
+    region: oregon       # or 'frankfurt', etc.
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    autoDeploy: true
+    healthCheckPath: /health
+
+    # Persist your generated PDF reports here
+    disk:
+      name: reports
+      mountPath: /opt/render/project/src/reports
+      sizeGB: 1
+
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.8
+
+      # Where the backend is reachable publicly (used in links in email/SMS)
+      - key: BASE_URL
+        value: https://stroketron-api.onrender.com
+
+      # Allow your Vercel app through CORS (update with your real domain)
+      - key: FRONTEND_ORIGIN
+        value: https://YOUR-VERCEL-APP.vercel.app
+
+      
