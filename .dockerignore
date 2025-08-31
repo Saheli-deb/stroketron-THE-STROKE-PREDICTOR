@@ -1,0 +1,26 @@
+# Git / editors
+.git
+.gitignore
+.vscode
+.idea
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache
+
+# Node/React bits if the frontend lives here too
+node_modules/
+dist/
+build/
+
+# Virtual envs
+.venv/
+venv/
+
+# Local artifacts
+reports/
+.env
+.env.local
