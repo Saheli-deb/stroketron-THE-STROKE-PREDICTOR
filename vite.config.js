@@ -10,6 +10,7 @@ export default defineConfig({
       "/tts": { target: "http://127.0.0.1:8000", changeOrigin: true },
       "/reports": { target: "http://127.0.0.1:8000", changeOrigin: true }, // ✅ add this
       "/download-pdf": { target: "http://127.0.0.1:8000", changeOrigin: true },
+      
     },
   },
 });
