@@ -11,7 +11,4 @@ python-dotenv
 pandas
 numpy
 scikit-learn
-joblib
-fpdf2
 gTTS
-twilio
